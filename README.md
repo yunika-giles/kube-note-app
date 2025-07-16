@@ -2,186 +2,115 @@
 
 A basic Notes API app (Node.js or Python) that stores user notes in a file system and displays a welcome message (configured using a ConfigMap).
 
-# 🧭 Kube Notes App - Kubernetes Workflow
+# 🧭 Full Project Workflow – Kube Notes App
 
-This project demonstrates the following Kubernetes concepts:
-- Volumes
-- Persistent Volumes (PV)
-- ConfigMaps
-- Using ConfigMaps in Deployments
+This project demonstrates how to build a simple Flask-based notes app and deploy it on Kubernetes using:
 
----
-
-## 🔹 STEP 1: Prepare Your Environment
-
-**Requirements:**
-- Minikube or Kubernetes cluster
-- kubectl installed and configured
-- Docker (if you build a custom image)
+- ✅ Volumes and Persistent Volumes
+- ✅ ConfigMaps and environment injection
+- ✅ RBAC (ServiceAccount, Role, RoleBinding)
+- ✅ NodePort for browser access
 
 ---
 
-## 🔹 STEP 2: Create the Application
+## 📁 Directory Structure
 
-Use a simple Python Flask app with:
-- `/` - Shows welcome message (from ConfigMap)
-- `/note` - Saves notes to volume
-- `/notes` - Reads notes from volume
-
----
-
-## 🔹 STEP 3: Containerize the Application
-
-**Optional Dockerfile**
-
-```python
-FROM python:3.9
-WORKDIR /app
-COPY . .
-RUN pip install -r requirements.txt
-CMD ["python", "app.py"]
+```
+kube-notes-app/
+├── app/                    # Flask app code
+│   ├── app.py
+│   └── requirements.txt
+├── Dockerfile              # For building the app image
+├── configmap.yaml          # App config (welcome message)
+├── pvc.yaml                # Persistent Volume Claim
+├── deployment.yaml         # Deployment resource
+├── service.yaml            # NodePort Service
+├── rbac/                   # RBAC config files
+│   ├── serviceaccount.yaml
+│   ├── role.yaml
+│   └── rolebinding.yaml
+└── workflow.md             # Detailed project steps
 ```
 
-**Build & Push**
+---
 
-```bash
+## 🔹 Step 1: Build and Push Docker Image
+
+(Optional if you're not using a local image)
+
+```
 docker build -t <your-username>/kube-notes-app:latest .
 docker push <your-username>/kube-notes-app:latest
 ```
 
 ---
 
-## 🔹 STEP 4: Create Kubernetes Resources
+## 🔹 Step 2: Apply Kubernetes Resources
 
-### ✅ 4.1 ConfigMap
-
-**File: configmap.yaml**
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: welcome-config
-data:
-  WELCOME_MESSAGE: "Welcome to the Kube Notes App!"
-```
-
+### ✅ Create ConfigMap
 ```
 kubectl apply -f configmap.yaml
 ```
 
-### ✅ 4.2 Persistent Volume Claim
-
-**File: pvc.yaml**
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: notes-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
+### ✅ Create Persistent Volume Claim
 ```
-
-```bash
 kubectl apply -f pvc.yaml
 ```
 
-### ✅ 4.3 Deployment
-
-**File: deployment.yaml**
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: notes-deployment
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: notes
-  template:
-    metadata:
-      labels:
-        app: notes
-    spec:
-      containers:
-      - name: notes-container
-        image: <your-dockerhub-username>/kube-notes-app:latest
-        ports:
-          - containerPort: 5000
-        env:
-        - name: WELCOME_MESSAGE
-          valueFrom:
-            configMapKeyRef:
-              name: welcome-config
-              key: WELCOME_MESSAGE
-        volumeMounts:
-        - name: notes-volume
-          mountPath: /data
-      volumes:
-      - name: notes-volume
-        persistentVolumeClaim:
-          claimName: notes-pvc
+### ✅ Set up RBAC
+```
+kubectl apply -f rbac/serviceaccount.yaml
+kubectl apply -f rbac/role.yaml
+kubectl apply -f rbac/rolebinding.yaml
 ```
 
-```bash
+### ✅ Deploy the App
+Update `deployment.yaml` to use your Docker image and set `serviceAccountName: notes-app-sa`.
+
+```
 kubectl apply -f deployment.yaml
 ```
 
-### ✅ 4.4 Service
-
-**File: service.yaml**
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: notes-service
-spec:
-  type: NodePort
-  selector:
-    app: notes
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 5000
-      nodePort: 30036
+### ✅ Expose the App
 ```
-
-```bash
 kubectl apply -f service.yaml
 ```
 
 ---
 
-## 🔹 STEP 5: Access the App
+## 🔹 Step 3: Access the App
 
-```bash
+```
 minikube service notes-service
 ```
 
-Visit:
-```bash
+Then visit:
+```
 http://<minikube-ip>:30036/
 ```
 
 ---
 
-## 🔹 STEP 6: Test the App
+## 🔹 Step 4: Test Endpoints
 
-- `GET /` → Welcome message (from ConfigMap)
-- `POST /note` with `note=Your text` → Saves it
-- `GET /notes` → Shows saved notes
+- `GET /` → Displays welcome message (from ConfigMap)
+- `POST /note` (form-data: `note=Hello`) → Saves a note
+- `GET /notes` → Returns all saved notes
 
 ---
 
-## 🔹 STEP 7: Clean Up
+## 🔹 Step 5: Clean Up
 
-```bash
+```
 kubectl delete -f service.yaml
 kubectl delete -f deployment.yaml
 kubectl delete -f pvc.yaml
 kubectl delete -f configmap.yaml
+kubectl delete -f rbac/rolebinding.yaml
+kubectl delete -f rbac/role.yaml
+kubectl delete -f rbac/serviceaccount.yaml
 ```
+
+---
+
+Happy Kube Coding! 🚀
