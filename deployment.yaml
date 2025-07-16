@@ -12,6 +12,7 @@ spec:
       labels:
         app: notes
     spec:
+      serviceAccountName: notes-app-sa
       containers:
       - name: notes-container
         image: python:3.9
